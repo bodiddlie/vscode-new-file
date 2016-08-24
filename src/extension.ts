@@ -29,24 +29,13 @@ export function activate(context: ExtensionContext) {
 }
 
 export class FileController {
-  public getDefaultFileName(): string {
-    if (!window.activeTextEditor) {
-      return path.join(this.homedir(), 'newFile.ts');
-    }
-    
-    const currentFileName: string = window.activeTextEditor ? window.activeTextEditor.document.fileName : '';
-    const ext: string = path.extname(currentFileName) || '.ts';
-    const filePath: string = path.dirname(currentFileName);
-    
-    return path.join(filePath, `newFile${ext}`);
-  }
-  
   public showFileNameDialog(): Q.Promise<string> {
     const deferred: Q.Deferred<string> = Q.defer<string>();
 
     window.showInputBox({
-      prompt: 'What\'s the path and name of the new file? (Relative to current file)',
-      value: this.getDefaultFileName()
+      placeHolder: 'File path relative to workspace root',
+      value: '',
+      prompt: 'Enter path of file to create or open.'
     }).then((relativeFilePath) => {
       if (relativeFilePath) {
         deferred.resolve(relativeFilePath);
@@ -103,59 +92,9 @@ export class FileController {
 
   public determineFullPath(filePath): Q.Promise<string> {
     const deferred: Q.Deferred<string> = Q.defer<string>();
-    const homePath: string = this.homedir();
-    let suggestedPath: string = path.join(homePath, filePath);
-    const root: string = window.activeTextEditor ? window.activeTextEditor.document.fileName : suggestedPath;
-    const isUntitled: boolean = window.activeTextEditor ? window.activeTextEditor.document.isUntitled : true;
+    let suggestedPath: string = path.join(workspace.rootPath, filePath);
 
-    if (filePath.indexOf('/') === 0 || filePath.indexOf('~') === 0) {
-      deferred.resolve(filePath);
-      return deferred.promise;
-    }
-
-    if (root && !isUntitled) {
-      deferred.resolve(path.join(path.dirname(root), filePath))
-      return deferred.promise;
-    }
-    
-    const options: QuickPickOptions = {
-      matchOnDescription: true,
-      placeHolder: "You don't have a file open. Should we use your home path?"
-    };
-
-    const choices: QuickPickItem[] = [
-      { label: 'Yes', description: `Use ${suggestedPath}.`},
-      { label: 'No', description: 'Let me declare the absolute path.'}
-    ];
-
-    window.showQuickPick(choices, options).then((choice) => {
-      if (!choice) {
-        deferred.reject(null);
-        return;
-      }
-
-      if (choice.label === 'Yes') {
-        deferred.resolve(suggestedPath);
-        return;
-      }
-
-      window.showInputBox({
-        prompt: `What should be the base path for '${filePath}'`,
-        value: homePath
-      }).then((basePath) => {
-        if (!basePath) {
-          deferred.reject(null);
-          return;
-        }
-
-        deferred.resolve(path.join(basePath, filePath));
-      })
-    });
-
+    deferred.resolve(suggestedPath);
     return deferred.promise;
-  }
-  
-  private homedir(): string {
-    return process.env[(process.platform == 'win32') ? 'USERPROFILE' : 'HOME'];
   }
 }
